@@ -9,6 +9,8 @@ import com.example.taskmanagement.entity.User;
 import com.example.taskmanagement.repository.ProjectRepository;
 import com.example.taskmanagement.repository.TaskRepository;
 import com.example.taskmanagement.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -105,5 +107,17 @@ public class TaskService {
 
         task.setStatus(status);
         return new TaskResponseDTO(taskRepository.save(task));
+    }
+
+    public Page<TaskResponseDTO> getTasks(TaskStatus status, Pageable pageable, User authenticatedUser) {
+        Page<Task> tasksPage;
+
+        if (status != null) {
+            tasksPage = taskRepository.findByProjectOwnerIdAndStatus(authenticatedUser.getId(), status, pageable);
+        } else {
+            tasksPage = taskRepository.findByProjectOwnerId(authenticatedUser.getId(), pageable);
+        }
+
+        return tasksPage.map(TaskResponseDTO::new);
     }
 }
