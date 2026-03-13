@@ -20,6 +20,8 @@ public class TaskRequestDTO {
     // Optional status for creation, typically defaults to TODO
     private TaskStatus status;
 
+    private Long version; // Added for optimistic locking
+
     // Getters and Setters
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -31,4 +33,12 @@ public class TaskRequestDTO {
     public void setAssigneeId(UUID assigneeId) { this.assigneeId = assigneeId; }
     public TaskStatus getStatus() { return status; }
     public void setStatus(TaskStatus status) { this.status = status; }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
 }

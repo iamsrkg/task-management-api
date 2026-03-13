@@ -3,6 +3,7 @@ package com.example.taskmanagement.exception;
 import com.example.taskmanagement.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -59,6 +60,15 @@ public class GlobalExceptionHandler {
 
         // Pack the Map of errors into the data field of our ApiResponse
         return new ResponseEntity<>(ApiResponse.success("Validation failed", errors), HttpStatus.BAD_REQUEST);
+    }
+
+    // Handle Optimistic Locking (Stale Data / Concurrency)
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLockingException(ObjectOptimisticLockingFailureException ex, WebRequest request) {
+        return new ResponseEntity<>(
+                ApiResponse.error("Conflict: This record was updated by another user or process. Please refresh and try again."),
+                HttpStatus.CONFLICT
+        );
     }
 
     // Handle absolutely everything else (so stack traces don't leak)

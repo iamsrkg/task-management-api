@@ -15,6 +15,7 @@ public class TaskResponseDTO {
     private String assigneeEmail;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long version;
 
     public TaskResponseDTO() {}
 
@@ -27,6 +28,7 @@ public class TaskResponseDTO {
         this.assigneeEmail = task.getAssignee() != null ? task.getAssignee().getEmail() : null;
         this.createdAt = task.getCreatedAt();
         this.updatedAt = task.getUpdatedAt();
+        this.version = task.getVersion();
     }
 
     // Getters
@@ -38,4 +40,5 @@ public class TaskResponseDTO {
     public String getAssigneeEmail() { return assigneeEmail; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public Long getVersion() { return version; }
 }

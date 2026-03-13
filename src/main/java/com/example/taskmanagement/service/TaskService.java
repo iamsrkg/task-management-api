@@ -64,6 +64,11 @@ public class TaskService {
             throw new UnauthorizedException("Unauthorized to update this task");
         }
 
+        // Optimistic Locking Check
+        if (request.getVersion() != null && !request.getVersion().equals(task.getVersion())) {
+            throw new org.springframework.orm.ObjectOptimisticLockingFailureException(Task.class, task.getId());
+        }
+
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
         
