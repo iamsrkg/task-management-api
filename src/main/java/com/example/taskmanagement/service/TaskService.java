@@ -4,8 +4,8 @@ import com.example.taskmanagement.dto.TaskRequestDTO;
 import com.example.taskmanagement.dto.TaskResponseDTO;
 import com.example.taskmanagement.entity.Project;
 import com.example.taskmanagement.entity.Task;
-import com.example.taskmanagement.entity.TaskStatus;
-import com.example.taskmanagement.entity.User;
+import com.example.taskmanagement.exception.ResourceNotFoundException;
+import com.example.taskmanagement.exception.UnauthorizedException;
 import com.example.taskmanagement.repository.ProjectRepository;
 import com.example.taskmanagement.repository.TaskRepository;
 import com.example.taskmanagement.repository.UserRepository;
@@ -30,11 +30,11 @@ public class TaskService {
 
     public TaskResponseDTO createTask(TaskRequestDTO request, User authenticatedUser) {
         Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() -> new RuntimeException("Project not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + request.getProjectId()));
 
         // Extra Validation: User must own the project to add a task to it
         if (!project.getOwner().getId().equals(authenticatedUser.getId())) {
-            throw new RuntimeException("Unauthorized: You do not own this project");
+            throw new UnauthorizedException("Unauthorized: You do not own this project");
         }
 
         Task task = new Task();
@@ -48,7 +48,7 @@ public class TaskService {
 
         if (request.getAssigneeId() != null) {
             User assignee = userRepository.findById(request.getAssigneeId())
-                    .orElseThrow(() -> new RuntimeException("Assignee not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Assignee not found with id: " + request.getAssigneeId()));
             task.setAssignee(assignee);
         }
 
@@ -58,10 +58,10 @@ public class TaskService {
 
     public TaskResponseDTO updateTask(UUID taskId, TaskRequestDTO request, User authenticatedUser) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
 
         if (!task.getProject().getOwner().getId().equals(authenticatedUser.getId())) {
-            throw new RuntimeException("Unauthorized");
+            throw new UnauthorizedException("Unauthorized to update this task");
         }
 
         task.setTitle(request.getTitle());
@@ -73,7 +73,7 @@ public class TaskService {
 
         if (request.getAssigneeId() != null) {
             User assignee = userRepository.findById(request.getAssigneeId())
-                    .orElseThrow(() -> new RuntimeException("Assignee not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Assignee not found with id: " + request.getAssigneeId()));
             task.setAssignee(assignee);
         } else {
             task.setAssignee(null);
@@ -84,10 +84,10 @@ public class TaskService {
 
     public void deleteTask(UUID taskId, User authenticatedUser) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
 
         if (!task.getProject().getOwner().getId().equals(authenticatedUser.getId())) {
-            throw new RuntimeException("Unauthorized");
+            throw new UnauthorizedException("Unauthorized to delete this task");
         }
 
         taskRepository.delete(task);
@@ -95,14 +95,14 @@ public class TaskService {
 
     public TaskResponseDTO changeStatus(UUID taskId, TaskStatus status, User authenticatedUser) {
         Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new RuntimeException("Task not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
 
         // Either the owner of the project OR the assigned user can update the status
         boolean isOwner = task.getProject().getOwner().getId().equals(authenticatedUser.getId());
         boolean isAssignee = task.getAssignee() != null && task.getAssignee().getId().equals(authenticatedUser.getId());
 
         if (!isOwner && !isAssignee) {
-            throw new RuntimeException("Unauthorized to change task status");
+            throw new UnauthorizedException("Unauthorized to change task status");
         }
 
         task.setStatus(status);

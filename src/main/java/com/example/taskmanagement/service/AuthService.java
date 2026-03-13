@@ -5,6 +5,8 @@ import com.example.taskmanagement.dto.RegisterRequest;
 import com.example.taskmanagement.dto.TokenResponse;
 import com.example.taskmanagement.entity.Role;
 import com.example.taskmanagement.entity.User;
+import com.example.taskmanagement.exception.ResourceNotFoundException;
+import com.example.taskmanagement.exception.UnauthorizedException;
 import com.example.taskmanagement.repository.UserRepository;
 import com.example.taskmanagement.security.JwtService;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -34,7 +36,7 @@ public class AuthService {
 
     public TokenResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("User with this email already exists");
+            throw new IllegalArgumentException("User with this email already exists");
         }
 
         User user = new User();
@@ -49,15 +51,19 @@ public class AuthService {
     }
 
     public TokenResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+        } catch (Exception e) {
+            throw new UnauthorizedException("Invalid email or password");
+        }
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         String jwtToken = jwtService.generateToken(user);
         return new TokenResponse(jwtToken);
