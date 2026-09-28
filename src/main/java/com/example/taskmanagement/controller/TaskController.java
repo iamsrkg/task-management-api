@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -71,6 +72,18 @@ public class TaskController {
         return ResponseEntity.ok(ApiResponse.success("Task status updated", updatedTask));
     }
 
+    @GetMapping("/{taskId}")
+    public ResponseEntity<ApiResponse<TaskResponseDTO>> getTask(
+            @PathVariable UUID taskId,
+            Authentication authentication
+    ) {
+        User currentUser = (User) authentication.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.success("Task fetched successfully", taskService.getTask(taskId, currentUser)));
+    }
+
+    private static final Set<String> SORTABLE_FIELDS = Set.of("createdAt", "updatedAt", "title", "status");
+    private static final int MAX_PAGE_SIZE = 100;
+
     @GetMapping
     public ResponseEntity<ApiResponse<Page<TaskResponseDTO>>> getTasks(
             @RequestParam(required = false) TaskStatus status,
@@ -80,11 +93,18 @@ public class TaskController {
             Authentication authentication
     ) {
         User currentUser = (User) authentication.getPrincipal();
-        
-        // Parse sort parameter (e.g. "createdAt,desc")
-        Sort.Direction direction = sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sort[0]));
-        
+
+        // Sort comes from user input, so only whitelisted fields reach the query.
+        String field = sort[0];
+        if (!SORTABLE_FIELDS.contains(field)) {
+            throw new IllegalArgumentException("sort field must be one of " + SORTABLE_FIELDS);
+        }
+        Sort.Direction direction = sort.length > 1 && sort[1].equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new IllegalArgumentException("page must be >= 0 and size between 1 and " + MAX_PAGE_SIZE);
+        }
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, field));
+
         Page<TaskResponseDTO> tasks = taskService.getTasks(status, pageable, currentUser);
         return ResponseEntity.ok(ApiResponse.success("Tasks fetched successfully", tasks));
     }

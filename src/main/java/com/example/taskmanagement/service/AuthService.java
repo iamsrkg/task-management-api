@@ -1,5 +1,7 @@
 package com.example.taskmanagement.service;
 
+import org.springframework.security.authentication.BadCredentialsException;
+
 import com.example.taskmanagement.dto.LoginRequest;
 import com.example.taskmanagement.dto.RegisterRequest;
 import com.example.taskmanagement.dto.TokenResponse;
@@ -59,7 +61,8 @@ public class AuthService {
                     )
             );
         } catch (Exception e) {
-            throw new UnauthorizedException("Invalid email or password");
+            // Same answer for unknown email and wrong password (no account enumeration); 401, not 403.
+            throw new BadCredentialsException("Invalid email or password");
         }
 
         User user = userRepository.findByEmail(request.getEmail())

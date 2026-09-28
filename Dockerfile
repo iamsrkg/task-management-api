@@ -1,26 +1,27 @@
-# Stage 1: Build the application
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+# Stage 1: build with the full JDK + Maven
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
 
-# Copy the pom.xml and download dependencies
+# Dependencies first, so this layer is cached until pom.xml changes
 COPY pom.xml .
-RUN mvn dependency:go-offline
+RUN mvn -B dependency:go-offline
 
-# Copy the source code and build
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
-# Stage 2: Run the application
+# Stage 2: small runtime image with just the JRE and the jar
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Copy the built jar file from the builder stage
+# Don't run as root
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
 COPY --from=builder /app/target/task-management-api-0.0.1-SNAPSHOT.jar app.jar
 
-# Expose the application port
 EXPOSE 8080
 
-# Run the jar file
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Respect the container's memory limit
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]

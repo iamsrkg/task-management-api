@@ -1,6 +1,7 @@
 package com.example.taskmanagement.controller;
 
-import com.example.taskmanagement.entity.User;
+import com.example.taskmanagement.dto.ApiResponse;
+import com.example.taskmanagement.dto.UserResponseDTO;
 import com.example.taskmanagement.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,7 +24,8 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers() {
-        return ResponseEntity.ok(userRepository.findAll());
+    public ResponseEntity<ApiResponse<List<UserResponseDTO>>> getAllUsers() {
+        List<UserResponseDTO> users = userRepository.findAll().stream().map(UserResponseDTO::new).toList();
+        return ResponseEntity.ok(ApiResponse.success("Users fetched successfully", users));
     }
 }
