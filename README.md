@@ -44,6 +44,16 @@ For anything beyond local development, copy `.env.example` to `.env` and set `JW
 ./mvnw test
 ```
 
+## Deploy (Render + Neon, free tier)
+
+1. Create a free PostgreSQL database on [Neon](https://neon.tech). From its connection string `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`, note the host, database, user and password.
+2. On [Render](https://render.com), go to **New → Blueprint**, pick this repo, and Render reads `render.yaml`. When prompted, set:
+   - `SPRING_DATASOURCE_URL` = `jdbc:postgresql://HOST/DB?sslmode=require`
+   - `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` = the Neon credentials
+3. Render generates `JWT_SECRET` and `ADMIN_PASSWORD`, builds the Dockerfile and health-checks `/actuator/health`.
+
+Free instances sleep after 15 minutes idle. The first request afterwards takes about 30–60 s while the JVM starts.
+
 ## API
 
 All endpoints except auth and health need `Authorization: Bearer <token>`.
