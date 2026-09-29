@@ -32,6 +32,17 @@ class ApiIntegrationTests {
     // ---------- authentication ----------
 
     @Test
+    void apiDocsArePublicAndRootOpensThem() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("Task Management API"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"));
+        mvc.perform(get("/"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/swagger-ui.html"));
+    }
+
+    @Test
     void requestWithoutTokenGets401() throws Exception {
         mvc.perform(get("/api/tasks"))
                 .andExpect(status().isUnauthorized())

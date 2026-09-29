@@ -27,6 +27,15 @@ A REST API for projects and tasks where every user sees only their own data. It'
 | **Traceability** | `X-Request-Id` on every response and in every log line (MDC) | One search follows a request end to end. |
 | **Config** | Secrets come from environment variables | The dev defaults in `application.properties` are for local use only. |
 
+## Try it in your browser
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/iamsrkg/task-management-api?quickstart=1)
+
+One click starts the real service (Spring Boot + PostgreSQL) in your own GitHub account. After about 2–3 minutes, a browser tab opens on **Swagger UI**:
+1. Call `POST /api/auth/login` with `{"email": "admin@example.com", "password": "admin123"}`, or register your own user.
+2. Copy the `token`, click **Authorize** and paste it.
+3. Try the rules above: create a project and a task, then edit the task twice with the same `version` (the second call gets **409**), or register a second user and read the first user's task (**404**).
+
 ## Run it
 
 **With Docker** (API + PostgreSQL):
@@ -35,7 +44,7 @@ git clone https://github.com/iamsrkg/task-management-api.git
 cd task-management-api
 docker compose up --build
 ```
-The API waits for PostgreSQL to be healthy, then listens on `http://localhost:8080`. Check it with `GET /actuator/health`.
+The API waits for PostgreSQL to be healthy, then listens on `http://localhost:8080`, which opens Swagger UI. Check health with `GET /actuator/health`.
 
 For anything beyond local development, copy `.env.example` to `.env` and set `JWT_SECRET` (`openssl rand -base64 32`) and `ADMIN_PASSWORD`.
 

@@ -1,0 +1,17 @@
+{
+  "name": "Task Management API: Spring Boot 4 + PostgreSQL",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": { "cpus": 2, "memory": "4gb" },
+  // Builds the API image and starts it with PostgreSQL (docker-compose.yml). First start takes ~2-3 minutes.
+  "postStartCommand": "docker compose up -d --build",
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "Task API · opens Swagger UI", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": ["README.md"] }
+  }
+}
