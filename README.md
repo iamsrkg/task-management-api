@@ -9,7 +9,7 @@ A REST API for projects and tasks where every user sees only their own data. It'
 - rate limiting
 - one consistent error format
 
-**Stack:** Java 21 · Spring Boot 4 · Spring Security 7 · Spring Data JPA / Hibernate · PostgreSQL 15 · JJWT · Docker · JUnit 5 + MockMvc · GitHub Actions
+**Stack:** Java 21 · Spring Boot 4 · Spring Security 7 · Spring Data JPA / Hibernate · PostgreSQL 15 · JJWT · springdoc-openapi (Swagger UI) · Docker · JUnit 5 + MockMvc · GitHub Actions
 
 ---
 
@@ -65,7 +65,7 @@ Free instances sleep after 15 minutes idle. The first request afterwards takes a
 
 ## API
 
-All endpoints except auth and health need `Authorization: Bearer <token>`.
+All endpoints except auth, health and the docs need `Authorization: Bearer <token>`.
 
 | Method | Path | Notes |
 |---|---|---|
@@ -82,6 +82,8 @@ All endpoints except auth and health need `Authorization: Bearer <token>`.
 | `PATCH` | `/api/tasks/{id}/status?status=DONE` | Owner or assignee |
 | `DELETE` | `/api/tasks/{id}` | Owner only |
 | `GET` | `/actuator/health` | Public health check |
+| `GET` | `/swagger-ui.html` | Public. Interactive docs for everything above (`/` redirects here) |
+| `GET` | `/v3/api-docs` | Public. The OpenAPI 3 spec as JSON |
 
 The first run seeds an admin (`admin@example.com` / `admin123` locally, or set `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 
