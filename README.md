@@ -31,6 +31,53 @@ A REST API for projects and tasks where every user sees only their own data. It'
 | **Traceability** | `X-Request-Id` on every response and in every log line (MDC) | One search follows a request end to end. |
 | **Config** | Secrets come from environment variables | The dev defaults in `application.properties` are for local use only. |
 
+## How a request is handled
+
+The cheapest checks come first, so a request that is going to be refused costs as little as possible:
+
+```mermaid
+flowchart LR
+    R[Request] --> ID[Request id on the response and every log line]
+    ID --> RL{Rate limit: token bucket per client}
+    RL -->|bucket empty| E429[429 + Retry-After]
+    RL -->|token taken| JWT{JWT valid?}
+    JWT -->|missing, expired or tampered| E401[401]
+    JWT -->|yes| ROLE{Role allowed?}
+    ROLE -->|no| E403[403]
+    ROLE -->|yes| Q[Query scoped to the caller]
+    Q -->|no row| E404[404: same answer for missing and for another tenant]
+    Q -->|row found| V{Version matches?}
+    V -->|stale| E409[409]
+    V -->|current| OK[200]
+```
+
+The rate limit runs before authentication on purpose: checking a password is deliberately slow, and a flood should be turned away before that work is done.
+
+## How a session lives and ends
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant D as Database
+
+    C->>A: POST /api/auth/login (email, password)
+    A->>D: store the SHA-256 hash of a new refresh token
+    A-->>C: access token (1 hour) + refresh token (7 days)
+    Note over C,A: the access token is sent on every request until it expires
+    C->>A: POST /api/auth/refresh (refresh token)
+    A->>D: mark that token revoked, store the hash of a new one
+    A-->>C: new access token + new refresh token
+    C->>A: POST /api/auth/refresh (the OLD refresh token again)
+    A->>D: already revoked, so revoke every token of this user
+    A-->>C: 401, sign in again
+    C->>A: POST /api/auth/logout (refresh token)
+    A->>D: mark it revoked
+    A-->>C: 204
+```
+
+A refresh token that shows up after it was used means either a client replayed it or someone stole it. There is no way to tell which, so every session of that user is ended.
+
 ## Try it in your browser
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/iamsrkg/task-management-api?quickstart=1)
