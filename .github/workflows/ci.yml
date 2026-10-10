@@ -46,13 +46,12 @@ jobs:
             # Flyway built the schema in the real PostgreSQL, and Hibernate accepted it (the app would not have started otherwise)
             test "$(docker compose exec -T db psql -U postgres -d task_db -tAc 'select count(*) from flyway_schema_history where success')" = 2
             # a refresh token buys a new pair once, and only once
-            REFRESH=$(echo "$LOGIN" | sed -E 's/.*"refreshToken":"([^"]+)".*//')
+            REFRESH=$(echo "$LOGIN" | sed -E 's/.*"refreshToken":"([^"]+)".*/\1/')
             curl -sf -X POST http://localhost:8080/api/auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$REFRESH\"}" | grep -q '"refreshToken"'
             test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/api/auth/refresh -H 'Content-Type: application/json' -d "{\"refreshToken\":\"$REFRESH\"}")" = 401
             # the rate limit buckets are in Redis, and the limit is enforced
             docker compose exec -T redis redis-cli --scan --pattern 'ratelimit:*' | grep -q ratelimit
-            seq 1 200 | xargs -P 25 -I{} curl -s -o /dev/null -w '%{http_code}
-' http://localhost:8080/api/tasks | sort | uniq -c
-            seq 1 200 | xargs -P 25 -I{} curl -s -o /dev/null -w '%{http_code}
-' http://localhost:8080/api/tasks | grep -q 429
+            CODES=$(seq 1 200 | xargs -P 25 -I{} curl -s -o /dev/null -w '%{http_code} ' http://localhost:8080/api/tasks)
+            echo "$CODES" | tr ' ' '\n' | sort | uniq -c
+            echo "$CODES" | grep -q 429
             echo "Codespace start-up check passed"
