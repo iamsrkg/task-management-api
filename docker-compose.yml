@@ -18,6 +18,17 @@ services:
       timeout: 3s
       retries: 10
 
+  # Holds the rate limit buckets, so several copies of the API would share one limit.
+  redis:
+    image: redis:7-alpine
+    container_name: task_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build: .
     container_name: task_api
@@ -27,7 +38,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      RATE_LIMIT_STORE: redis
+      RATE_LIMIT_REDIS_HEALTH: "true"
+      REDIS_HOST: redis
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/task_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}

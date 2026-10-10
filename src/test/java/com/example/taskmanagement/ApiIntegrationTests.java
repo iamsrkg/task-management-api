@@ -209,7 +209,68 @@ class ApiIntegrationTests {
                 .andExpect(header().string("X-Request-Id", "trace-12345678"));
     }
 
+    @Test
+    void aRefreshTokenBuysANewPairAndThenStopsWorking() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        String first = field(loginBody(email), "refreshToken");
+
+        String refreshed = refresh(first).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String newAccess = field(refreshed, "token");
+        String second = field(refreshed, "refreshToken");
+        assertThat(second).isNotEqualTo(first);
+
+        mvc.perform(get("/api/users/me").header("Authorization", bearer(newAccess))).andExpect(status().isOk());
+        refresh(first).andExpect(status().isUnauthorized());   // single use
+    }
+
+    @Test
+    void replayingAUsedRefreshTokenEndsEverySessionOfThatUser() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        String stolen = field(loginBody(email), "refreshToken");
+        String current = field(refresh(stolen).andReturn().getResponse().getContentAsString(), "refreshToken");
+
+        refresh(stolen).andExpect(status().isUnauthorized());    // someone presents the old one again...
+        refresh(current).andExpect(status().isUnauthorized());   // ...so the newest one is revoked too
+    }
+
+    @Test
+    void logoutRevokesTheRefreshTokenAndAlwaysAnswers204() throws Exception {
+        String email = uniqueEmail();
+        register(email);
+        String token = field(loginBody(email), "refreshToken");
+
+        logout(token).andExpect(status().isNoContent());
+        refresh(token).andExpect(status().isUnauthorized());
+        logout("never-issued").andExpect(status().isNoContent());   // doesn't reveal whether a token exists
+    }
+
+    @Test
+    void anUnknownOrMissingRefreshTokenIsRejected() throws Exception {
+        refresh("made-up-token").andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/refresh").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
     // ---------- helpers ----------
+
+    private String loginBody(String email) throws Exception {
+        return mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private ResultActions refresh(String refreshToken) throws Exception {
+        return mvc.perform(post("/api/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"" + refreshToken + "\"}"));
+    }
+
+    private ResultActions logout(String refreshToken) throws Exception {
+        return mvc.perform(post("/api/auth/logout").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"refreshToken\":\"" + refreshToken + "\"}"));
+    }
 
     private String register() throws Exception {
         return register(uniqueEmail());

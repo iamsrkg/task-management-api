@@ -1,5 +1,10 @@
 package com.example.taskmanagement.config;
 
+import com.example.taskmanagement.security.InMemoryRateLimitStore;
+import com.example.taskmanagement.security.RateLimitStore;
+import com.example.taskmanagement.security.RedisRateLimitStore;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import com.example.taskmanagement.security.JsonErrorWriter;
 import com.example.taskmanagement.security.JwtAuthenticationFilter;
 import com.example.taskmanagement.security.RateLimitFilter;
@@ -43,9 +48,23 @@ public class SecurityConfig {
     @Value("${app.rate-limit.refill-per-second}")
     private double rateLimitRefillPerSecond;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider) {
+    @Value("${app.rate-limit.store:memory}")
+    private String rateLimitStore;
+
+    private final ObjectProvider<StringRedisTemplate> redis;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider,
+                          ObjectProvider<StringRedisTemplate> redis) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationProvider = authenticationProvider;
+        this.redis = redis;
+    }
+
+    /** One instance can count in memory; several have to share their buckets, which is what Redis is for. */
+    private RateLimitStore rateLimitStore() {
+        return "redis".equalsIgnoreCase(rateLimitStore)
+                ? new RedisRateLimitStore(redis.getObject())
+                : new InMemoryRateLimitStore();
     }
 
     @Bean
@@ -72,7 +91,7 @@ public class SecurityConfig {
 
         // Cheapest checks first: tag the request, then rate limit, then authenticate.
         if (rateLimitEnabled) {
-            http.addFilterBefore(new RateLimitFilter(rateLimitCapacity, rateLimitRefillPerSecond), JwtAuthenticationFilter.class);
+            http.addFilterBefore(new RateLimitFilter(rateLimitStore(), rateLimitCapacity, rateLimitRefillPerSecond), JwtAuthenticationFilter.class);
             http.addFilterBefore(new RequestIdFilter(), RateLimitFilter.class);
         } else {
             http.addFilterBefore(new RequestIdFilter(), JwtAuthenticationFilter.class);

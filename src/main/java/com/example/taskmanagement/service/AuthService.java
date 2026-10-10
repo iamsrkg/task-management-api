@@ -1,5 +1,6 @@
 package com.example.taskmanagement.service;
 
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.authentication.BadCredentialsException;
 
 import com.example.taskmanagement.dto.LoginRequest;
@@ -23,17 +24,40 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            AuthenticationManager authenticationManager
+            AuthenticationManager authenticationManager,
+            RefreshTokenService refreshTokenService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.refreshTokenService = refreshTokenService;
+    }
+
+    /**
+     * A refresh token is exchanged for a new access token and a new refresh token.
+     * One transaction, so the token's owner is still loaded when the new tokens are made; and a
+     * rejected token must not undo the revocations that rejecting it caused.
+     */
+    @Transactional(noRollbackFor = BadCredentialsException.class)
+    public TokenResponse refresh(String refreshToken) {
+        User user = refreshTokenService.consume(refreshToken);
+        return tokensFor(user);
+    }
+
+    /** Ends the session the refresh token belongs to. The access token runs out on its own. */
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
+    }
+
+    private TokenResponse tokensFor(User user) {
+        return new TokenResponse(jwtService.generateToken(user), refreshTokenService.issue(user));
     }
 
     public TokenResponse register(RegisterRequest request) {
@@ -48,8 +72,7 @@ public class AuthService {
 
         userRepository.save(user);
 
-        String jwtToken = jwtService.generateToken(user);
-        return new TokenResponse(jwtToken);
+        return tokensFor(user);
     }
 
     public TokenResponse login(LoginRequest request) {
@@ -68,7 +91,6 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        String jwtToken = jwtService.generateToken(user);
-        return new TokenResponse(jwtToken);
+        return tokensFor(user);
     }
 }

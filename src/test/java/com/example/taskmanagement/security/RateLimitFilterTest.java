@@ -40,4 +40,26 @@ class RateLimitFilterTest {
         filter.doFilter(request, response, new MockFilterChain());
         return response;
     }
+
+    @Test
+    void theFilterTakesItsDecisionFromTheStoreSoInstancesCanShareOne() throws Exception {
+        // two filters stand for two instances of the API; with a shared store they share one limit
+        RateLimitStore shared = new InMemoryRateLimitStore();
+        RateLimitFilter instanceA = new RateLimitFilter(shared, 2, 0.01);
+        RateLimitFilter instanceB = new RateLimitFilter(shared, 2, 0.01);
+
+        assertThat(call(instanceA).getStatus()).isEqualTo(200);
+        assertThat(call(instanceB).getStatus()).isEqualTo(200);
+        assertThat(call(instanceA).getStatus()).isEqualTo(429);
+        assertThat(call(instanceB).getStatus()).isEqualTo(429);
+    }
+
+    private static org.springframework.mock.web.MockHttpServletResponse call(RateLimitFilter filter) throws Exception {
+        org.springframework.mock.web.MockHttpServletRequest request =
+                new org.springframework.mock.web.MockHttpServletRequest("GET", "/api/tasks");
+        request.setRemoteAddr("198.51.100.7");
+        org.springframework.mock.web.MockHttpServletResponse response = new org.springframework.mock.web.MockHttpServletResponse();
+        filter.doFilter(request, response, new org.springframework.mock.web.MockFilterChain());
+        return response;
+    }
 }

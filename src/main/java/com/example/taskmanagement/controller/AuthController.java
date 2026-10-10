@@ -1,5 +1,6 @@
 package com.example.taskmanagement.controller;
 
+import com.example.taskmanagement.dto.RefreshRequest;
 import com.example.taskmanagement.dto.LoginRequest;
 import com.example.taskmanagement.dto.RegisterRequest;
 import com.example.taskmanagement.dto.TokenResponse;
@@ -29,5 +30,18 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    /** Trades a refresh token for a new access token and a new refresh token. The old one stops working. */
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.refresh(request.getRefreshToken()));
+    }
+
+    /** Signs out: the refresh token can no longer be used. Always 204, whether or not it existed. */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.noContent().build();
     }
 }

@@ -8,26 +8,26 @@ import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Token-bucket rate limiting per client IP. Runs before authentication, so a rejected
  * request never reaches the password hasher or the database.
  *
- * In-memory buckets are per instance; running several replicas would need a shared
- * store (e.g. Redis) or limiting at the gateway.
+ * Where the buckets live is up to the RateLimitStore: this instance's memory, or Redis when
+ * several instances have to share one limit.
  */
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final int MAX_TRACKED_CLIENTS = 10_000;
-    private static final long IDLE_EVICTION_NANOS = 10L * 60 * 1_000_000_000;
-
+    private final RateLimitStore store;
     private final int capacity;
     private final double refillPerSecond;
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
     public RateLimitFilter(int capacity, double refillPerSecond) {
+        this(new InMemoryRateLimitStore(), capacity, refillPerSecond);
+    }
+
+    public RateLimitFilter(RateLimitStore store, int capacity, double refillPerSecond) {
+        this.store = store;
         this.capacity = capacity;
         this.refillPerSecond = refillPerSecond;
     }
@@ -42,48 +42,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        if (buckets.size() > MAX_TRACKED_CLIENTS) {
-            long now = System.nanoTime();
-            buckets.values().removeIf(b -> now - b.lastRefill > IDLE_EVICTION_NANOS);
-        }
 
-        Bucket bucket = buckets.computeIfAbsent(request.getRemoteAddr(), k -> new Bucket(capacity));
-        long remaining;
-        long retryAfterSeconds = 0;
-        boolean allowed;
-        synchronized (bucket) {
-            bucket.refill(capacity, refillPerSecond);
-            allowed = bucket.tokens >= 1;
-            if (allowed) {
-                bucket.tokens -= 1;
-            } else {
-                retryAfterSeconds = (long) Math.ceil((1 - bucket.tokens) / refillPerSecond);
-            }
-            remaining = (long) Math.floor(bucket.tokens);
-        }
+        RateLimitStore.Decision decision = store.tryConsume(request.getRemoteAddr(), capacity, refillPerSecond);
 
         response.setHeader("X-RateLimit-Limit", String.valueOf(capacity));
-        response.setHeader("X-RateLimit-Remaining", String.valueOf(remaining));
-        if (!allowed) {
-            response.setHeader("Retry-After", String.valueOf(Math.max(1, retryAfterSeconds)));
-            JsonErrorWriter.write(response, 429, "Too many requests. Retry after " + Math.max(1, retryAfterSeconds) + "s.");
+        response.setHeader("X-RateLimit-Remaining", String.valueOf(decision.remaining()));
+        if (!decision.allowed()) {
+            long retryAfter = Math.max(1, decision.retryAfterSeconds());
+            response.setHeader("Retry-After", String.valueOf(retryAfter));
+            JsonErrorWriter.write(response, 429, "Too many requests. Retry after " + retryAfter + "s.");
             return;
         }
         filterChain.doFilter(request, response);
-    }
-
-    static final class Bucket {
-        double tokens;
-        long lastRefill = System.nanoTime();
-
-        Bucket(int capacity) {
-            this.tokens = capacity;
-        }
-
-        void refill(int capacity, double refillPerSecond) {
-            long now = System.nanoTime();
-            tokens = Math.min(capacity, tokens + (now - lastRefill) / 1_000_000_000.0 * refillPerSecond);
-            lastRefill = now;
-        }
     }
 }
